@@ -1,11 +1,15 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store';
 import './Profile.css';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, favorites } = useAppStore();
-  const { assets } = user;
+  const { user, fetchUser, favorites } = useAppStore();
+
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
 
   return (
     <div className="profile-page">
@@ -14,8 +18,8 @@ export default function Profile() {
           <div className="user-avatar">
             <span>👤</span>
           </div>
-          <h3 className="username">{user.username}</h3>
-          <p className="userphone">{user.phone}</p>
+          <h3 className="username">{user?.username || '加载中...'}</h3>
+          <p className="userphone">{user?.phone || ''}</p>
 
           <div className="vip-badge">★ 超级会员</div>
 
@@ -23,19 +27,21 @@ export default function Profile() {
             <h4>我的资产</h4>
             <div className="assets-grid">
               <div className="asset-item">
-                <span className="asset-value">¥{assets.redPacket.toFixed(2)}</span>
+                <span className="asset-value">
+                  ¥{user?.assets.redPacket.toFixed(2) || '0.00'}
+                </span>
                 <span className="asset-label">红包</span>
               </div>
               <div className="asset-item">
-                <span className="asset-value">{assets.coupons}</span>
+                <span className="asset-value">{user?.assets.coupons || 0}</span>
                 <span className="asset-label">优惠券</span>
               </div>
               <div className="asset-item">
-                <span className="asset-value">{assets.coins}</span>
+                <span className="asset-value">{user?.assets.coins || 0}</span>
                 <span className="asset-label">淘金币</span>
               </div>
               <div className="asset-item">
-                <span className="asset-value">{assets.points}</span>
+                <span className="asset-value">{user?.assets.points || 0}</span>
                 <span className="asset-label">积分</span>
               </div>
             </div>

@@ -1,16 +1,47 @@
 import { create } from 'zustand';
-import type { Product, CartItem, Address, User } from '../types';
+import { api } from '../api';
+import type { Product, CartItem, Address } from '../types';
+
+interface User {
+  id: number;
+  username: string;
+  phone: string;
+  vipLevel: number;
+  assets: {
+    redPacket: number;
+    coupons: number;
+    coins: number;
+    points: number;
+  };
+}
 
 interface AppState {
   // 用户信息
-  user: User;
+  user: User | null;
+  fetchUser: () => Promise<void>;
+
+  // 商品
+  products: Product[];
+  fetchProducts: (params?: { search?: string; sort?: string }) => Promise<void>;
+  currentProduct: Product | null;
+  setCurrentProduct: (product: Product | null) => void;
+
+  // 搜索
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
 
   // 购物车
   cart: CartItem[];
-  addToCart: (product: Product, color?: string, size?: string) => void;
-  removeFromCart: (id: number) => void;
-  updateQuantity: (id: number, quantity: number) => void;
-  clearCart: () => void;
+  fetchCart: () => Promise<void>;
+  addToCart: (
+    product: Product,
+    color?: string,
+    size?: string,
+    quantity?: number
+  ) => Promise<void>;
+  removeFromCart: (id: number) => Promise<void>;
+  updateQuantity: (id: number, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
   getCartTotal: () => number;
   getCartCount: () => number;
 
@@ -21,109 +52,102 @@ interface AppState {
   // 地址
   addresses: Address[];
   currentAddress: Address | null;
+  fetchAddresses: () => Promise<void>;
 
-  // 搜索
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
+  // 消息
+  messages: any[];
+  fetchMessages: () => Promise<void>;
 
-  // 当前商品
-  currentProduct: Product | null;
-  setCurrentProduct: (product: Product | null) => void;
+  // 营销活动
+  promotions: any[];
+  fetchPromotions: () => Promise<void>;
 
   // 当前页面
   currentPage: string;
   setCurrentPage: (page: string) => void;
+
+  // 加载状态
+  loading: boolean;
 }
 
-const initialUser: User = {
-  id: 1,
-  username: 'Tom123',
-  phone: '138****8888',
-  avatar: '',
-  vipLevel: 3,
-  assets: {
-    redPacket: 128.5,
-    coupons: 5,
-    coins: 386,
-    points: 120,
-  },
-};
-
-const initialAddresses: Address[] = [
-  {
-    id: 1,
-    name: '张三',
-    phone: '138****8888',
-    province: '广东省',
-    city: '深圳市',
-    district: '南山区',
-    detail: '科技园南路88号XX大厦A座1001室',
-    isDefault: true,
-  },
-];
-
 export const useAppStore = create<AppState>((set, get) => ({
-  user: initialUser,
+  user: null,
+  fetchUser: async () => {
+    try {
+      const user = await api.user.info();
+      set({ user });
+    } catch (e) {
+      console.error('获取用户信息失败', e);
+    }
+  },
+
+  products: [],
+  fetchProducts: async (params) => {
+    try {
+      set({ loading: true });
+      const products = await api.products.list(params);
+      set({ products, loading: false });
+    } catch (e) {
+      console.error('获取商品失败', e);
+      set({ loading: false });
+    }
+  },
+
+  currentProduct: null,
+  setCurrentProduct: (product) => set({ currentProduct: product }),
+
+  searchQuery: '',
+  setSearchQuery: (query) => set({ searchQuery: query }),
 
   cart: [],
-
-  addToCart: (product, color, size) => {
-    set((state) => {
-      const existing = state.cart.find(
-        (item) =>
-          item.product.id === product.id &&
-          item.selectedColor === color &&
-          item.selectedSize === size
-      );
-
-      if (existing) {
-        return {
-          cart: state.cart.map((item) =>
-            item.id === existing.id
-              ? { ...item, quantity: item.quantity + 1 }
-              : item
-          ),
-        };
-      }
-
-      return {
-        cart: [
-          ...state.cart,
-          {
-            id: Date.now(),
-            product,
-            quantity: 1,
-            selectedColor: color,
-            selectedSize: size,
-          },
-        ],
-      };
-    });
+  fetchCart: async () => {
+    try {
+      const cart = await api.cart.list();
+      set({ cart });
+    } catch (e) {
+      console.error('获取购物车失败', e);
+    }
   },
 
-  removeFromCart: (id) => {
-    set((state) => ({
-      cart: state.cart.filter((item) => item.id !== id),
-    }));
+  addToCart: async (product, color, size, quantity = 1) => {
+    try {
+      await api.cart.add({ product, quantity, selectedColor: color, selectedSize: size });
+      await get().fetchCart();
+    } catch (e) {
+      console.error('添加购物车失败', e);
+    }
   },
 
-  updateQuantity: (id, quantity) => {
-    if (quantity < 1) return;
-    set((state) => ({
-      cart: state.cart.map((item) =>
-        item.id === id ? { ...item, quantity } : item
-      ),
-    }));
+  removeFromCart: async (id) => {
+    try {
+      await api.cart.remove(id);
+      await get().fetchCart();
+    } catch (e) {
+      console.error('删除购物车失败', e);
+    }
   },
 
-  clearCart: () => set({ cart: [] }),
+  updateQuantity: async (id, quantity) => {
+    try {
+      await api.cart.update(id, quantity);
+      await get().fetchCart();
+    } catch (e) {
+      console.error('更新数量失败', e);
+    }
+  },
+
+  clearCart: async () => {
+    try {
+      await api.cart.clear();
+      set({ cart: [] });
+    } catch (e) {
+      console.error('清空购物车失败', e);
+    }
+  },
 
   getCartTotal: () => {
     const { cart } = get();
-    return cart.reduce(
-      (sum, item) => sum + item.product.price * item.quantity,
-      0
-    );
+    return cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   },
 
   getCartCount: () => {
@@ -132,7 +156,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   favorites: [],
-
   toggleFavorite: (id) => {
     set((state) => ({
       favorites: state.favorites.includes(id)
@@ -141,19 +164,42 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
-  addresses: initialAddresses,
+  addresses: [],
+  currentAddress: null,
+  fetchAddresses: async () => {
+    try {
+      const addresses = await api.user.addresses();
+      set({
+        addresses,
+        currentAddress: addresses.find((a: Address) => a.isDefault) || addresses[0] || null,
+      });
+    } catch (e) {
+      console.error('获取地址失败', e);
+    }
+  },
 
-  currentAddress: initialAddresses[0],
+  messages: [],
+  fetchMessages: async () => {
+    try {
+      const messages = await api.messages.list();
+      set({ messages });
+    } catch (e) {
+      console.error('获取消息失败', e);
+    }
+  },
 
-  searchQuery: '',
-
-  setSearchQuery: (query) => set({ searchQuery: query }),
-
-  currentProduct: null,
-
-  setCurrentProduct: (product) => set({ currentProduct: product }),
+  promotions: [],
+  fetchPromotions: async () => {
+    try {
+      const promotions = await api.promotions.list();
+      set({ promotions });
+    } catch (e) {
+      console.error('获取营销活动失败', e);
+    }
+  },
 
   currentPage: 'home',
-
   setCurrentPage: (page) => set({ currentPage: page }),
+
+  loading: false,
 }));

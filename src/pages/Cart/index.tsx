@@ -1,10 +1,23 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store';
 import './Cart.css';
 
 export default function Cart() {
   const navigate = useNavigate();
-  const { cart, updateQuantity, removeFromCart, getCartTotal, getCartCount } = useAppStore();
+  const {
+    cart,
+    fetchCart,
+    updateQuantity,
+    removeFromCart,
+    getCartTotal,
+    getCartCount,
+  } = useAppStore();
+
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
+
   const total = getCartTotal();
   const count = getCartCount();
 
@@ -103,9 +116,7 @@ export default function Cart() {
 
           <div className="final-total">
             <span>合计</span>
-            <span className="total-amount">
-              ¥{(total * 0.9).toFixed(2)}
-            </span>
+            <span className="total-amount">¥{(total * 0.9).toFixed(2)}</span>
           </div>
 
           <button className="checkout-btn" onClick={handleCheckout}>

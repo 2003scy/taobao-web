@@ -1,24 +1,40 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store';
+import { api } from '../../api';
 import './Checkout.css';
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { cart, getCartTotal, currentAddress, clearCart } = useAppStore();
+  const { cart, getCartTotal, fetchCart, fetchAddresses, currentAddress } = useAppStore();
   const [selectedPay, setSelectedPay] = useState('alipay');
   const [remark, setRemark] = useState('');
   const total = getCartTotal();
   const discounted = total * 0.9;
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    fetchCart();
+    fetchAddresses();
+  }, [fetchCart, fetchAddresses]);
+
+  const handleSubmit = async () => {
     if (cart.length === 0) {
       alert('购物车是空的');
       return;
     }
-    clearCart();
-    alert('订单提交成功！');
-    navigate('/');
+    try {
+      await api.orders.submit({
+        items: cart,
+        total: discounted,
+        address: currentAddress,
+        payment: selectedPay,
+      });
+      alert('订单提交成功！');
+      navigate('/');
+    } catch (e) {
+      console.error('提交订单失败', e);
+      alert('提交失败');
+    }
   };
 
   if (cart.length === 0) {

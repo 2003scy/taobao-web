@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ProductCard from '../../components/ProductCard';
-import { products, categories } from '../../data';
 import { useAppStore } from '../../store';
+import { categories } from '../../data';
 import './Home.css';
 
 type SortType = 'comprehensive' | 'sales' | 'price';
@@ -9,29 +9,17 @@ type SortType = 'comprehensive' | 'sales' | 'price';
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState('全部');
   const [sortType, setSortType] = useState<SortType>('comprehensive');
-  const { searchQuery } = useAppStore();
+  const { products, fetchProducts, searchQuery, loading } = useAppStore();
 
   const allCategories = ['全部', ...categories];
 
-  const filteredProducts = products.filter((p) => {
-    if (!searchQuery) return true;
-    return (
-      p.title.includes(searchQuery) ||
-      p.shop.includes(searchQuery) ||
-      p.location.includes(searchQuery)
-    );
-  });
-
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    switch (sortType) {
-      case 'sales':
-        return b.sales - a.sales;
-      case 'price':
-        return a.price - b.price;
-      default:
-        return b.id - a.id;
-    }
-  });
+  useEffect(() => {
+    const params: { search?: string; sort?: string } = {};
+    if (searchQuery) params.search = searchQuery;
+    if (sortType === 'sales') params.sort = 'sales';
+    if (sortType === 'price') params.sort = 'price';
+    fetchProducts(params);
+  }, [searchQuery, sortType, fetchProducts]);
 
   return (
     <div className="home">
@@ -42,9 +30,7 @@ export default function Home() {
             {allCategories.map((cat) => (
               <li
                 key={cat}
-                className={`category-item ${
-                  activeCategory === cat ? 'active' : ''
-                }`}
+                className={`category-item ${activeCategory === cat ? 'active' : ''}`}
                 onClick={() => setActiveCategory(cat)}
               >
                 {cat}
@@ -75,13 +61,17 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="product-grid">
-            {sortedProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="loading">加载中...</div>
+          ) : (
+            <div className="product-grid">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
 
-          {sortedProducts.length === 0 && (
+          {!loading && products.length === 0 && (
             <div className="empty-state">
               <p>没有找到相关商品</p>
             </div>

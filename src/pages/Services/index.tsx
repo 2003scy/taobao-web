@@ -1,7 +1,15 @@
-import { messages, promotions } from '../../data';
+import { useEffect } from 'react';
+import { useAppStore } from '../../store';
 import './Services.css';
 
 export default function Services() {
+  const { messages, fetchMessages, promotions, fetchPromotions } = useAppStore();
+
+  useEffect(() => {
+    fetchMessages();
+    fetchPromotions();
+  }, [fetchMessages, fetchPromotions]);
+
   return (
     <div className="services-page">
       <div className="services-container">
